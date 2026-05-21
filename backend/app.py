@@ -3,15 +3,20 @@ import hashlib
 from datetime import datetime, timedelta
 
 import jwt
+import psycopg2
+from psycopg2.extras import RealDictCursor
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-
-from app.db import get_connection
 
 app = Flask(__name__)
 CORS(app)
 
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@db:5432/saas")
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
+
+
+def get_connection():
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 
 def hash_password(password):
@@ -204,3 +209,7 @@ def create_project(payload):
             }
         }
     ), 201
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)

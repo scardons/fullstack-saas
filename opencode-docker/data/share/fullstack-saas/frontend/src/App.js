@@ -1,4 +1,4 @@
-//frontend/src/App.js
+//opencode-docker/data/share/fullstack-saas/frontend/src/App.js
 import React, { useState } from "react";
 
 const API = "http://localhost:5000";

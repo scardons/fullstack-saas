@@ -1,30 +1,67 @@
-//frontend/src/App.js
 import React, { useState } from "react";
 
 const API = "http://localhost:5000";
 
+interface User {
+  id: number;
+  username: string;
+}
+
+interface Workspace {
+  id: number;
+  name: string;
+  role: "Admin" | "Editor" | "Lector";
+}
+
+interface Project {
+  id: number;
+  name: string;
+  description: string;
+}
+
+interface LoginResponse {
+  user: User;
+  workspaces: Workspace[];
+  session_token: string;
+}
+
+interface TokenResponse {
+  token: string;
+  role: "Admin" | "Editor" | "Lector";
+}
+
+interface ProjectsResponse {
+  projects: Project[];
+}
+
+interface ProjectResponse {
+  project: Project;
+}
+
+interface ErrorResponse {
+  error: string;
+}
+
 function App() {
-  const [view, setView] = useState("login");
-  const [user, setUser] = useState(null);
-  const [workspaces, setWorkspaces] = useState([]);
+  const [view, setView] = useState<"login" | "workspace" | "dashboard">("login");
+  const [user, setUser] = useState<User | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [sessionToken, setSessionToken] = useState("");
   const [workspaceToken, setWorkspaceToken] = useState("");
-  const [activeWorkspace, setActiveWorkspace] = useState(null);
-  const [activeRole, setActiveRole] = useState("");
-  const [projects, setProjects] = useState([]);
-  const [error, setError] = useState("");
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
+  const [activeRole, setActiveRole] = useState<"Admin" | "Editor" | "Lector" | "">("");
+  const [projects, setProjects] = useState<Project[]>([]);
 
-  async function handleLogin(username, password) {
-    setError("");
+  async function handleLogin(username: string, password: string) {
     try {
       const res = await fetch(`${API}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      const data = await res.json();
+      const data: LoginResponse & ErrorResponse = await res.json();
       if (!res.ok) {
-        setError(data.error || "Error al iniciar sesión");
+        alert(data.error || "Error al iniciar sesión");
         return;
       }
       setUser(data.user);
@@ -32,12 +69,11 @@ function App() {
       setSessionToken(data.session_token);
       setView("workspace");
     } catch {
-      setError("Error de conexión con el servidor");
+      alert("Error de conexión con el servidor");
     }
   }
 
-  async function handleSelectWorkspace(workspaceId) {
-    setError("");
+  async function handleSelectWorkspace(workspaceId: number) {
     try {
       const res = await fetch(`${API}/api/auth/token`, {
         method: "POST",
@@ -47,35 +83,35 @@ function App() {
         },
         body: JSON.stringify({ workspace_id: workspaceId }),
       });
-      const data = await res.json();
+      const data: TokenResponse & ErrorResponse = await res.json();
       if (!res.ok) {
-        setError(data.error || "Error al seleccionar workspace");
+        alert(data.error || "Error al seleccionar workspace");
         return;
       }
       setWorkspaceToken(data.token);
       setActiveRole(data.role);
-      const ws = workspaces.find((w) => w.id === workspaceId);
+      const ws = workspaces.find((w) => w.id === workspaceId) || null;
       setActiveWorkspace(ws);
       await loadProjects(data.token);
       setView("dashboard");
     } catch {
-      setError("Error de conexión con el servidor");
+      alert("Error de conexión con el servidor");
     }
   }
 
-  async function loadProjects(token) {
+  async function loadProjects(token: string) {
     try {
       const res = await fetch(`${API}/api/projects`, {
-        headers: { Authorization: `Bearer ${token || workspaceToken}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
+      const data: ProjectsResponse & ErrorResponse = await res.json();
       if (res.ok) {
         setProjects(data.projects);
       } else {
-        setError(data.error || "Error al cargar proyectos");
+        alert(data.error || "Error al cargar proyectos");
       }
     } catch {
-      setError("Error de conexión con el servidor");
+      alert("Error de conexión con el servidor");
     }
   }
 
@@ -83,7 +119,6 @@ function App() {
     const name = prompt("Nombre del proyecto:");
     if (!name) return;
     const description = prompt("Descripción (opcional):") || "";
-    setError("");
     try {
       const res = await fetch(`${API}/api/projects`, {
         method: "POST",
@@ -93,14 +128,14 @@ function App() {
         },
         body: JSON.stringify({ name, description }),
       });
-      const data = await res.json();
+      const data: ProjectResponse & ErrorResponse = await res.json();
       if (!res.ok) {
-        setError(data.error || "Error al crear proyecto");
+        alert(data.error || "Error al crear proyecto");
         return;
       }
       setProjects([...projects, data.project]);
     } catch {
-      setError("Error de conexión con el servidor");
+      alert("Error de conexión con el servidor");
     }
   }
 
@@ -112,12 +147,11 @@ function App() {
     setActiveWorkspace(null);
     setActiveRole("");
     setProjects([]);
-    setError("");
     setView("login");
   }
 
   if (view === "login") {
-    return <LoginView onLogin={handleLogin} error={error} />;
+    return <LoginView onLogin={handleLogin} />;
   }
 
   if (view === "workspace") {
@@ -126,7 +160,6 @@ function App() {
         user={user}
         workspaces={workspaces}
         onSelect={handleSelectWorkspace}
-        error={error}
       />
     );
   }
@@ -138,18 +171,17 @@ function App() {
       projects={projects}
       canCreate={activeRole === "Admin" || activeRole === "Editor"}
       onCreate={handleCreateProject}
-      onRefresh={() => loadProjects()}
+      onRefresh={() => loadProjects(workspaceToken)}
       onLogout={handleLogout}
-      error={error}
     />
   );
 }
 
-function LoginView({ onLogin, error }) {
+function LoginView({ onLogin }: { onLogin: (u: string, p: string) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  function handleSubmit(e) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     onLogin(username, password);
   }
@@ -172,7 +204,6 @@ function LoginView({ onLogin, error }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {error && <p style={styles.error}>{error}</p>}
           <button style={styles.button} type="submit">
             Ingresar
           </button>
@@ -182,7 +213,15 @@ function LoginView({ onLogin, error }) {
   );
 }
 
-function WorkspaceView({ user, workspaces, onSelect, error }) {
+function WorkspaceView({
+  user,
+  workspaces,
+  onSelect,
+}: {
+  user: User | null;
+  workspaces: Workspace[];
+  onSelect: (id: number) => void;
+}) {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -198,7 +237,6 @@ function WorkspaceView({ user, workspaces, onSelect, error }) {
             <span style={styles.roleBadge}>{ws.role}</span>
           </div>
         ))}
-        {error && <p style={styles.error}>{error}</p>}
       </div>
     </div>
   );
@@ -212,7 +250,14 @@ function DashboardView({
   onCreate,
   onRefresh,
   onLogout,
-  error,
+}: {
+  workspace: Workspace | null;
+  role: string;
+  projects: Project[];
+  canCreate: boolean;
+  onCreate: () => void;
+  onRefresh: () => void;
+  onLogout: () => void;
 }) {
   return (
     <div style={styles.container}>
@@ -226,7 +271,6 @@ function DashboardView({
             Cerrar Sesión
           </button>
         </div>
-
         <div style={styles.toolbar}>
           {canCreate && (
             <button style={styles.createBtn} onClick={onCreate}>
@@ -237,9 +281,6 @@ function DashboardView({
             Actualizar
           </button>
         </div>
-
-        {error && <p style={styles.error}>{error}</p>}
-
         {projects.length === 0 ? (
           <p style={styles.text}>No hay proyectos en este workspace.</p>
         ) : (
@@ -255,7 +296,7 @@ function DashboardView({
   );
 }
 
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: "100vh",
     display: "flex",
@@ -370,11 +411,6 @@ const styles = {
     margin: 0,
     color: "#6c757d",
     fontSize: "0.9rem",
-  },
-  error: {
-    color: "#dc3545",
-    fontSize: "0.9rem",
-    marginTop: "0.5rem",
   },
 };
 
